@@ -1,0 +1,17 @@
+{
+	"name": "vad-node-realtime-examples",
+	"version": "1.0.0",
+	"description": "Examples for the vad-node-realtime package",
+	"scripts": {
+		"test": "tsx test-vad.ts",
+		"mic": "tsx mic-vad.ts"
+	},
+	"dependencies": {
+		"mic": "^2.1.2",
+		"onnxruntime-node": "^1.21.0",
+		"tsx": "^4.6.2"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.0"
+	}
+}

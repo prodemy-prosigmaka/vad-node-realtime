@@ -348,11 +348,6 @@ export class AudioNodeVAD {
 	};
 
 	destroy = () => {
-		if (this.audioNode instanceof AudioWorkletNode) {
-			this.audioNode.port.postMessage({
-				message: Message.SpeechStop,
-			});
-		}
 		this.audioNode.disconnect();
 		this.gainNode?.disconnect();
 	};

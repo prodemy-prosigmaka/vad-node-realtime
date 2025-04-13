@@ -1,5 +1,5 @@
 {
-	"name": "@eric-edouard/vad-node-realtime",
+	"name": "@ericedouard/vad-node-realtime",
 	"description": "Powerful, user-friendly realtime voice activity detector (VAD) for the node",
 	"keywords": [
 		"speech-recognition",
@@ -12,8 +12,9 @@
 		"offline-speech-recognition"
 	],
 	"homepage": "https://github.com/eric-edouard/vad-node-realtime",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"license": "ISC",
+	"private": false,
 	"main": "dist/index.js",
 	"devDependencies": {
 		"@types/express": "^4.17.17",

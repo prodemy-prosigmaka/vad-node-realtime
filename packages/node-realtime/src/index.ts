@@ -1,15 +1,9 @@
 export { FrameProcessor } from "./frame-processor";
 export type { FrameProcessorOptions } from "./frame-processor";
 export { Message } from "./messages";
-import {
-	arrayBufferToBase64,
-	audioFileToArray,
-	encodeWAV,
-	minFramesForTargetMS,
-} from "./utils";
+import { arrayBufferToBase64, encodeWAV, minFramesForTargetMS } from "./utils";
 
 export const utils = {
-	audioFileToArray,
 	minFramesForTargetMS,
 	arrayBufferToBase64,
 	encodeWAV,
