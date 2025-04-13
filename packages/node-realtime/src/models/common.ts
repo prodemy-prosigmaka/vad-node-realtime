@@ -12,7 +12,7 @@ export type OrtModule = typeof ort;
 
 export type ModelFactory = (
 	ortInstance: typeof ort,
-	modelPath: string,
+	modelFetcher: ModelFetcher,
 ) => Promise<Model>;
 
 export interface Model {

@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import * as ortInstance from "onnxruntime-node";
 import {
 	FrameProcessor,
@@ -198,8 +199,6 @@ export class MicVAD {
 
 export class AudioNodeVAD {
 	private audioNode!: AudioWorkletNode | ScriptProcessorNode;
-	private buffer?: Float32Array;
-	private bufferIndex = 0;
 	private frameProcessor: FrameProcessor;
 	private gainNode?: GainNode;
 	private resampler?: Resampler;
@@ -219,11 +218,15 @@ export class AudioNodeVAD {
 		}
 
 		const modelFile = `${__dirname}/silero_vad.onnx`;
+		const modelFetcher = async (): Promise<ArrayBuffer> => {
+			const contents = await fs.readFile(modelFile);
+			return contents.buffer;
+		};
 		const modelFactory: ModelFactory =
 			fullOptions.model === "v5" ? SileroV5.new : SileroLegacy.new;
 		let model: Model;
 		try {
-			model = await modelFactory(ort, modelFile);
+			model = await modelFactory(ort, modelFetcher);
 		} catch (e) {
 			console.error(
 				`Encountered an error while loading model file ${modelFile}`,
