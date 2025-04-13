@@ -1,18 +1,54 @@
-export { FrameProcessor } from "./frame-processor";
-export type { FrameProcessorOptions } from "./frame-processor";
-export { Message } from "./messages";
-import { arrayBufferToBase64, encodeWAV, minFramesForTargetMS } from "./utils";
+import * as fs from "node:fs/promises";
+import * as ort from "onnxruntime-node";
+import {
+	FrameProcessor,
+	type FrameProcessorOptions,
+	Message,
+	type NonRealTimeVADOptions,
+	PlatformAgnosticNonRealTimeVAD,
+	Resampler,
+	utils,
+} from "./common";
+import {
+	type RealTimeVADOptions,
+	StreamVAD,
+	defaultRealTimeVADOptions,
+} from "./real-time-vad";
 
-export const utils = {
-	minFramesForTargetMS,
-	arrayBufferToBase64,
-	encodeWAV,
+const modelPath = `${__dirname}/silero_vad.onnx`;
+
+const modelFetcher = async (): Promise<ArrayBuffer> => {
+	const contents = await fs.readFile(modelPath);
+	return contents.buffer;
 };
 
+class NonRealTimeVAD extends PlatformAgnosticNonRealTimeVAD {
+	static async new(
+		options: Partial<NonRealTimeVADOptions> = {},
+	): Promise<NonRealTimeVAD> {
+		return await this._new(modelFetcher, ort, options);
+	}
+}
+
+// Factory function to create a StreamVAD instance
+async function createStreamVAD(
+	options: Partial<RealTimeVADOptions> = {},
+): Promise<StreamVAD> {
+	return await StreamVAD.new(ort, modelFetcher, options);
+}
+
 export {
-	AudioNodeVAD,
-	DEFAULT_MODEL,
-	getDefaultRealTimeVADOptions,
-	MicVAD,
-} from "./real-time-vad";
-export type { RealTimeVADOptions } from "./real-time-vad";
+	FrameProcessor,
+	Message,
+	NonRealTimeVAD,
+	Resampler,
+	StreamVAD,
+	createStreamVAD,
+	defaultRealTimeVADOptions,
+	utils,
+};
+export type {
+	FrameProcessorOptions,
+	NonRealTimeVADOptions,
+	RealTimeVADOptions,
+};

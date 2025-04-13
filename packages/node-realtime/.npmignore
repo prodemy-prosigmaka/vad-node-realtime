@@ -1,10 +1,8 @@
 node_modules/
 playwright-report/
-scripts/
 src/
-test-site/
-tests/
+scripts/
+test/
 webpack.config.js
-playwright.config.ts
 tsconfig*
 !*.onnx

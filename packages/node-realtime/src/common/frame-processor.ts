@@ -49,23 +49,13 @@ export interface FrameProcessorOptions {
 	submitUserSpeechOnPause: boolean;
 }
 
-export const defaultLegacyFrameProcessorOptions: FrameProcessorOptions = {
+export const defaultFrameProcessorOptions: FrameProcessorOptions = {
 	positiveSpeechThreshold: 0.5,
 	negativeSpeechThreshold: 0.5 - 0.15,
 	preSpeechPadFrames: 1,
 	redemptionFrames: 8,
 	frameSamples: 1536,
 	minSpeechFrames: 3,
-	submitUserSpeechOnPause: false,
-};
-
-export const defaultV5FrameProcessorOptions: FrameProcessorOptions = {
-	positiveSpeechThreshold: 0.5,
-	negativeSpeechThreshold: 0.5 - 0.15,
-	preSpeechPadFrames: 3,
-	redemptionFrames: 24,
-	frameSamples: 512,
-	minSpeechFrames: 9,
 	submitUserSpeechOnPause: false,
 };
 
@@ -97,14 +87,12 @@ export function validateOptions(options: FrameProcessorOptions) {
 
 export interface FrameProcessorInterface {
 	resume: () => void;
-	process: (
-		arr: Float32Array,
-		handleEvent: (event: FrameProcessorEvent) => any,
-	) => Promise<any>;
-	endSegment: (handleEvent: (event: FrameProcessorEvent) => any) => {
+	process: (arr: Float32Array) => Promise<{
+		probs?: SpeechProbabilities;
 		msg?: Message;
 		audio?: Float32Array;
-	};
+	}>;
+	endSegment: () => { msg?: Message; audio?: Float32Array };
 }
 
 const concatArrays = (arrays: Float32Array[]): Float32Array => {
@@ -127,9 +115,7 @@ export class FrameProcessor implements FrameProcessorInterface {
 	speaking = false;
 	audioBuffer: { frame: Float32Array; isSpeech: boolean }[];
 	redemptionCounter = 0;
-	speechFrameCount = 0;
 	active = false;
-	speechRealStartFired = false;
 
 	constructor(
 		public modelProcessFunc: (
@@ -144,19 +130,18 @@ export class FrameProcessor implements FrameProcessorInterface {
 
 	reset = () => {
 		this.speaking = false;
-		this.speechRealStartFired = false;
 		this.audioBuffer = [];
 		this.modelResetFunc();
 		this.redemptionCounter = 0;
-		this.speechFrameCount = 0;
 	};
 
-	pause = (handleEvent: (event: FrameProcessorEvent) => any) => {
+	pause = () => {
 		this.active = false;
 		if (this.options.submitUserSpeechOnPause) {
-			this.endSegment(handleEvent);
+			return this.endSegment();
 		} else {
 			this.reset();
+			return {};
 		}
 	};
 
@@ -164,61 +149,51 @@ export class FrameProcessor implements FrameProcessorInterface {
 		this.active = true;
 	};
 
-	endSegment = (handleEvent: (event: FrameProcessorEvent) => any) => {
+	endSegment = () => {
 		const audioBuffer = this.audioBuffer;
 		this.audioBuffer = [];
 		const speaking = this.speaking;
 		this.reset();
 
+		const speechFrameCount = audioBuffer.reduce((acc, item) => {
+			return acc + +item.isSpeech;
+		}, 0);
+
 		if (speaking) {
-			const speechFrameCount = audioBuffer.reduce((acc, item) => {
-				return item.isSpeech ? acc + 1 : acc;
-			}, 0);
 			if (speechFrameCount >= this.options.minSpeechFrames) {
 				const audio = concatArrays(audioBuffer.map((item) => item.frame));
-				handleEvent({ msg: Message.SpeechEnd, audio });
+				return { msg: Message.SpeechEnd, audio };
 			} else {
-				handleEvent({ msg: Message.VADMisfire });
+				return { msg: Message.VADMisfire };
 			}
 		}
 		return {};
 	};
 
-	process = async (
-		frame: Float32Array,
-		handleEvent: (event: FrameProcessorEvent) => any,
-	) => {
+	process = async (frame: Float32Array) => {
 		if (!this.active) {
-			return;
+			return {};
 		}
 
 		const probs = await this.modelProcessFunc(frame);
-		const isSpeech = probs.isSpeech >= this.options.positiveSpeechThreshold;
-
-		handleEvent({ probs, msg: Message.FrameProcessed, frame });
-
 		this.audioBuffer.push({
 			frame,
-			isSpeech,
+			isSpeech: probs.isSpeech >= this.options.positiveSpeechThreshold,
 		});
 
-		if (isSpeech) {
-			this.speechFrameCount++;
+		if (
+			probs.isSpeech >= this.options.positiveSpeechThreshold &&
+			this.redemptionCounter
+		) {
 			this.redemptionCounter = 0;
 		}
 
-		if (isSpeech && !this.speaking) {
-			this.speaking = true;
-			handleEvent({ msg: Message.SpeechStart });
-		}
-
 		if (
-			this.speaking &&
-			this.speechFrameCount === this.options.minSpeechFrames &&
-			!this.speechRealStartFired
+			probs.isSpeech >= this.options.positiveSpeechThreshold &&
+			!this.speaking
 		) {
-			this.speechRealStartFired = true;
-			handleEvent({ msg: Message.SpeechRealStart });
+			this.speaking = true;
+			return { probs, msg: Message.SpeechStart, frame };
 		}
 
 		if (
@@ -227,21 +202,20 @@ export class FrameProcessor implements FrameProcessorInterface {
 			++this.redemptionCounter >= this.options.redemptionFrames
 		) {
 			this.redemptionCounter = 0;
-			this.speechFrameCount = 0;
 			this.speaking = false;
-			this.speechRealStartFired = false;
+
 			const audioBuffer = this.audioBuffer;
 			this.audioBuffer = [];
 
 			const speechFrameCount = audioBuffer.reduce((acc, item) => {
-				return item.isSpeech ? acc + 1 : acc;
+				return acc + +item.isSpeech;
 			}, 0);
 
 			if (speechFrameCount >= this.options.minSpeechFrames) {
 				const audio = concatArrays(audioBuffer.map((item) => item.frame));
-				handleEvent({ msg: Message.SpeechEnd, audio });
+				return { probs, msg: Message.SpeechEnd, audio, frame };
 			} else {
-				handleEvent({ msg: Message.VADMisfire });
+				return { probs, msg: Message.VADMisfire, frame };
 			}
 		}
 
@@ -249,27 +223,7 @@ export class FrameProcessor implements FrameProcessorInterface {
 			while (this.audioBuffer.length > this.options.preSpeechPadFrames) {
 				this.audioBuffer.shift();
 			}
-			this.speechFrameCount = 0;
 		}
+		return { probs, frame };
 	};
 }
-
-export type FrameProcessorEvent =
-	| {
-			msg: Message.VADMisfire;
-	  }
-	| {
-			msg: Message.SpeechStart;
-	  }
-	| {
-			msg: Message.SpeechRealStart;
-	  }
-	| {
-			msg: Message.SpeechEnd;
-			audio: Float32Array;
-	  }
-	| {
-			msg: Message.FrameProcessed;
-			probs: SpeechProbabilities;
-			frame: Float32Array;
-	  };

@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Readable } from "node:stream";
-import { AudioNodeVAD, getDefaultRealTimeVADOptions, utils } from "../dist";
+import { createStreamVAD, utils } from "../dist";
 
 // For this example to work, you'll need to install:
 // npm install mic
@@ -46,30 +46,17 @@ async function main() {
 		fileType: "raw",
 	});
 
-	// Create a simple audio context for the VAD
-	const audioContext = new globalThis.AudioContext({
-		sampleRate: 16000, // Use a fixed sample rate matching what the VAD expects
-	});
+	// Create a StreamVAD instance with the simplified API
+	console.log("Creating StreamVAD...");
 
-	// Get default VAD options
-	const vadOptions = getDefaultRealTimeVADOptions("legacy");
-
-	// Adjust thresholds for better detection
-	vadOptions.positiveSpeechThreshold = 0.3;
-	vadOptions.negativeSpeechThreshold = 0.2;
-
-	// Initialize the VAD
-	console.log("Creating AudioNodeVAD...");
-	console.log(
-		`Speech detection threshold: ${vadOptions.positiveSpeechThreshold}`,
-	);
-
-	const vad = await AudioNodeVAD.new(audioContext, {
-		...vadOptions,
-		// Reduce pre-speech padding to avoid long silence at the beginning
+	const streamVAD = await createStreamVAD({
+		// Speech detection settings
+		positiveSpeechThreshold: 0.3,
+		negativeSpeechThreshold: 0.2,
 		preSpeechPadFrames: 5,
-		// Reduce redemption frames to avoid long silence at the end
 		redemptionFrames: 8,
+
+		// Event handlers
 		onSpeechStart: () => console.log("\n🎤 Speech detected! Speaking..."),
 		onSpeechEnd: (audio: Float32Array) => {
 			// Trim silence from the beginning and end of the recording
@@ -108,20 +95,20 @@ async function main() {
 		},
 	});
 
-	// Start the VAD
-	vad.start();
+	// Start the VAD processing
+	streamVAD.start();
 
 	// Start the microphone
 	const micInputStream = micInstance.getAudioStream();
 	console.log("🎤 Microphone started - listening for speech...");
 
 	// Set up buffer processing
-	const bufferSize = vadOptions.frameSamples;
-	let audioBuffer = new Float32Array(bufferSize);
+	const FRAME_SIZE = 480; // Default frame size for StreamVAD
+	let audioBuffer = new Float32Array(FRAME_SIZE);
 	let bufferIndex = 0;
 
 	// Process microphone data
-	micInputStream.on("data", (data: Buffer) => {
+	micInputStream.on("data", async (data: Buffer) => {
 		// Convert the incoming PCM data to float32
 		const int16Data = new Int16Array(new Uint8Array(data).buffer);
 
@@ -133,14 +120,16 @@ async function main() {
 			audioBuffer[bufferIndex++] = sample;
 
 			// When the buffer is full, process it
-			if (bufferIndex >= bufferSize) {
-				// Process the frame (don't await to avoid blocking the audio stream)
-				vad
-					.processFrame(audioBuffer)
-					.catch((err) => console.error("Error processing frame:", err));
+			if (bufferIndex >= FRAME_SIZE) {
+				try {
+					// Process the frame with the streamVAD
+					await streamVAD.processAudio(audioBuffer);
+				} catch (err) {
+					console.error("Error processing frame:", err);
+				}
 
 				// Reset for the next frame
-				audioBuffer = new Float32Array(bufferSize);
+				audioBuffer = new Float32Array(FRAME_SIZE);
 				bufferIndex = 0;
 			}
 		}
@@ -153,8 +142,18 @@ async function main() {
 	process.on("SIGINT", async () => {
 		console.log("\nStopping microphone...");
 		micInstance.stop();
-		vad.destroy();
-		await audioContext.close();
+
+		// Process any remaining audio
+		if (bufferIndex > 0) {
+			const paddedBuffer = new Float32Array(FRAME_SIZE);
+			paddedBuffer.set(audioBuffer.slice(0, bufferIndex));
+			await streamVAD.processAudio(paddedBuffer);
+		}
+
+		// Clean up
+		await streamVAD.flush();
+		streamVAD.destroy();
+
 		process.exit(0);
 	});
 
@@ -215,42 +214,6 @@ function upsampleAudio(
 	}
 
 	return result;
-}
-
-// Polyfill AudioContext for Node.js environment
-if (!globalThis.AudioContext) {
-	class MockAudioContext {
-		sampleRate: number;
-
-		constructor(options: { sampleRate: number }) {
-			this.sampleRate = options.sampleRate;
-		}
-
-		createScriptProcessor() {
-			return {
-				connect: () => {},
-				disconnect: () => {},
-			};
-		}
-
-		createGain() {
-			return {
-				gain: { value: 0 },
-				connect: () => {},
-				disconnect: () => {},
-			};
-		}
-
-		get destination() {
-			return {};
-		}
-
-		close() {
-			return Promise.resolve();
-		}
-	}
-
-	globalThis.AudioContext = MockAudioContext as any;
 }
 
 main().catch((error) => {
