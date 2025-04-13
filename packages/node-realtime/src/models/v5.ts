@@ -1,6 +1,6 @@
 import type * as ort from "onnxruntime-node";
 import { log } from "../logging";
-import type { ModelFactory, SpeechProbabilities } from "./common";
+import type { ModelFactory, ModelFetcher, SpeechProbabilities } from "./common";
 
 function getNewState(ortInstance: typeof ort) {
 	const zeroes = Array(2 * 128).fill(0);
@@ -17,10 +17,10 @@ export class SileroV5 {
 
 	static new: ModelFactory = async (
 		ortInstance: typeof ort,
-		modelPath: string,
+		modelFetcher: ModelFetcher,
 	) => {
 		log.debug("Loading VAD...");
-		const modelArrayBuffer = modelPath;
+		const modelArrayBuffer = await modelFetcher();
 		const _session =
 			await ortInstance.InferenceSession.create(modelArrayBuffer);
 		// @ts-ignore
@@ -47,9 +47,12 @@ export class SileroV5 {
 		const out = await this._session.run(inputs);
 
 		// @ts-ignore
+		// biome-ignore lint/complexity/useLiteralKeys: <explanation>
 		this._state = out["stateN"];
 
 		// @ts-ignore
+		// biome-ignore lint/complexity/useLiteralKeys: <explanation>
+		// biome-ignore lint/correctness/noUnsafeOptionalChaining: <explanation>
 		const [isSpeech] = out["output"]?.data;
 		const notSpeech = 1 - isSpeech;
 		return { notSpeech, isSpeech };

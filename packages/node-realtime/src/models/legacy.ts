@@ -47,8 +47,11 @@ export class SileroLegacy {
 			sr: this._sr,
 		};
 		const out = await this._session.run(inputs);
+		// biome-ignore lint/complexity/useLiteralKeys: <explanation>
 		this._h = out["hn"] as ort.Tensor;
+		// biome-ignore lint/complexity/useLiteralKeys: <explanation>
 		this._c = out["cn"] as ort.Tensor;
+		// biome-ignore lint/complexity/useLiteralKeys: <explanation>
 		const [isSpeech] = out["output"]?.data as unknown as [number];
 		const notSpeech = 1 - isSpeech;
 		return { notSpeech, isSpeech };

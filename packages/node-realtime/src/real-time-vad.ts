@@ -90,7 +90,6 @@ export type RealTimeVADOptions =
 	| RealTimeVADOptionsWithStream
 	| RealTimeVADOptionsWithoutStream;
 
-const workletFile = "vad.worklet.bundle.min.js";
 const sileroV5File = "silero_vad_v5.onnx";
 const sileroLegacyFile = "silero_vad_legacy.onnx";
 
@@ -119,7 +118,6 @@ export const getDefaultRealTimeVADOptions: (
 		stream: undefined,
 		ortConfig: undefined,
 		model: DEFAULT_MODEL,
-		workletOptions: {},
 	};
 };
 
@@ -185,6 +183,7 @@ export class MicVAD {
 			this.pause();
 		}
 		if (this.options.stream === undefined) {
+			// biome-ignore lint/complexity/noForEach: <explanation>
 			this.stream.getTracks().forEach((track) => track.stop());
 		}
 		this.sourceNode.disconnect();
@@ -198,7 +197,7 @@ export class MicVAD {
 }
 
 export class AudioNodeVAD {
-	private audioNode!: AudioWorkletNode | ScriptProcessorNode;
+	private audioNode!: ScriptProcessorNode;
 	private frameProcessor: FrameProcessor;
 	private gainNode?: GainNode;
 	private resampler?: Resampler;
@@ -217,7 +216,7 @@ export class AudioNodeVAD {
 			fullOptions.ortConfig(ort);
 		}
 
-		const modelFile = `${__dirname}/silero_vad.onnx`;
+		const modelFile = `${__dirname}/${fullOptions.model === "v5" ? sileroV5File : sileroLegacyFile}`;
 		const modelFetcher = async (): Promise<ArrayBuffer> => {
 			const contents = await fs.readFile(modelFile);
 			return contents.buffer;
