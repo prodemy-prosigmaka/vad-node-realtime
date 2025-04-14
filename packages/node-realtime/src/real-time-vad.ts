@@ -59,7 +59,7 @@ export const defaultRealTimeVADOptions: RealTimeVADOptions = {
 	sampleRate: 16000,
 };
 
-export class StreamVAD {
+export class RealTimeVAD {
 	private frameProcessor: FrameProcessor;
 	private model: Silero;
 	private buffer: Float32Array = new Float32Array(0);
@@ -67,11 +67,14 @@ export class StreamVAD {
 	private active = false;
 	private resampler: Resampler | null = null;
 
+	/**
+	 * Create a new RealTimeVAD instance with external ONNX runtime and model fetcher
+	 */
 	static async new(
 		ort: ONNXRuntimeAPI,
 		modelFetcher: () => Promise<ArrayBuffer>,
 		options: Partial<RealTimeVADOptions> = {},
-	): Promise<StreamVAD> {
+	): Promise<RealTimeVAD> {
 		const fullOptions: RealTimeVADOptions = {
 			...defaultRealTimeVADOptions,
 			...options,
@@ -83,8 +86,19 @@ export class StreamVAD {
 		}
 
 		const model = await Silero.new(ort, modelFetcher);
-		const streamVAD = new StreamVAD(fullOptions, model);
-		return streamVAD;
+		const realTimeVAD = new RealTimeVAD(fullOptions, model);
+		return realTimeVAD;
+	}
+
+	/**
+	 * Create a new RealTimeVAD instance with provided model fetcher and ONNX runtime
+	 */
+	static async _new(
+		modelFetcher: () => Promise<ArrayBuffer>,
+		ort: ONNXRuntimeAPI,
+		options: Partial<RealTimeVADOptions> = {},
+	): Promise<RealTimeVAD> {
+		return await RealTimeVAD.new(ort, modelFetcher, options);
 	}
 
 	constructor(

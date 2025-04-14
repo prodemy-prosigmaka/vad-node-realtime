@@ -20,14 +20,14 @@ npm install @ericedouard/vad-node-realtime
 
 ### Real-time VAD
 
-Use `StreamVAD` when you need to process audio chunks in real time, such as receiving audio from a client application:
+Use `RealTimeVAD` when you need to process audio chunks in real time, such as receiving audio from a client application:
 
 ```javascript
-const { createStreamVAD } = require('@eric-edouard/vad-node-realtime');
+const { RealTimeVAD } = require('@eric-edouard/vad-node-realtime');
 
 async function example() {
-  // Create a new StreamVAD instance
-  const streamVAD = await createStreamVAD({
+  // Create a new RealTimeVAD instance
+  const vad = await RealTimeVAD.new({
     onSpeechStart: () => {
       console.log('Speech started');
     },
@@ -42,18 +42,18 @@ async function example() {
   });
 
   // Start processing
-  streamVAD.start();
+  vad.start();
 
   // When you receive audio chunks from your source:
   function onAudioChunkReceived(audioChunk) {
     // Process each chunk of audio data
     // audioChunk should be a Float32Array with sample rate matching the sampleRate option (default: 16000Hz)
-    await streamVAD.processAudio(audioChunk);
+    await vad.processAudio(audioChunk);
   }
 
   // When you're done with the stream:
-  await streamVAD.flush(); // Process any remaining audio
-  streamVAD.destroy(); // Clean up resources
+  await vad.flush(); // Process any remaining audio
+  vad.destroy(); // Clean up resources
 }
 
 example();
@@ -80,9 +80,9 @@ async function example() {
 
 ## API Reference
 
-### StreamVAD
+### RealTimeVAD
 
-- `createStreamVAD(options)`: Factory function to create a StreamVAD instance
+- `RealTimeVAD.new(options)`: Create a new RealTimeVAD instance
 - `start()`: Start processing audio
 - `pause()`: Pause processing audio
 - `processAudio(audioData)`: Process a chunk of audio data

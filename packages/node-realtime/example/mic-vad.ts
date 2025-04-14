@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Readable } from "node:stream";
-import { createStreamVAD, utils } from "../dist";
+import { RealTimeVAD, utils } from "../dist";
 
 // For this example to work, you'll need to install:
 // npm install mic
@@ -46,10 +46,10 @@ async function main() {
 		fileType: "raw",
 	});
 
-	// Create a StreamVAD instance with the simplified API
-	console.log("Creating StreamVAD...");
+	// Create a RealTimeVAD instance with the simplified API
+	console.log("Creating RealTimeVAD...");
 
-	const streamVAD = await createStreamVAD({
+	const vad = await RealTimeVAD.new({
 		// Speech detection settings
 		positiveSpeechThreshold: 0.3,
 		negativeSpeechThreshold: 0.2,
@@ -96,7 +96,7 @@ async function main() {
 	});
 
 	// Start the VAD processing
-	streamVAD.start();
+	vad.start();
 
 	// Start the microphone
 	const micInputStream = micInstance.getAudioStream();
@@ -122,8 +122,8 @@ async function main() {
 			// When the buffer is full, process it
 			if (bufferIndex >= FRAME_SIZE) {
 				try {
-					// Process the frame with the streamVAD
-					await streamVAD.processAudio(audioBuffer);
+					// Process the frame with the VAD
+					await vad.processAudio(audioBuffer);
 				} catch (err) {
 					console.error("Error processing frame:", err);
 				}
@@ -147,12 +147,12 @@ async function main() {
 		if (bufferIndex > 0) {
 			const paddedBuffer = new Float32Array(FRAME_SIZE);
 			paddedBuffer.set(audioBuffer.slice(0, bufferIndex));
-			await streamVAD.processAudio(paddedBuffer);
+			await vad.processAudio(paddedBuffer);
 		}
 
 		// Clean up
-		await streamVAD.flush();
-		streamVAD.destroy();
+		await vad.flush();
+		vad.destroy();
 
 		process.exit(0);
 	});

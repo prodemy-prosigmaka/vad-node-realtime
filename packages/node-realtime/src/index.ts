@@ -10,8 +10,8 @@ import {
 	utils,
 } from "./common";
 import {
+	RealTimeVAD as BaseRealTimeVAD,
 	type RealTimeVADOptions,
-	StreamVAD,
 	defaultRealTimeVADOptions,
 } from "./real-time-vad";
 
@@ -26,24 +26,28 @@ class NonRealTimeVAD extends PlatformAgnosticNonRealTimeVAD {
 	static async new(
 		options: Partial<NonRealTimeVADOptions> = {},
 	): Promise<NonRealTimeVAD> {
-		return await this._new(modelFetcher, ort, options);
+		return await PlatformAgnosticNonRealTimeVAD._new(
+			modelFetcher,
+			ort,
+			options,
+		);
 	}
 }
 
-// Factory function to create a StreamVAD instance
-async function createStreamVAD(
-	options: Partial<RealTimeVADOptions> = {},
-): Promise<StreamVAD> {
-	return await StreamVAD.new(ort, modelFetcher, options);
+class RealTimeVAD extends BaseRealTimeVAD {
+	static override async new(
+		options: Partial<RealTimeVADOptions> = {},
+	): Promise<RealTimeVAD> {
+		return await BaseRealTimeVAD._new(modelFetcher, ort, options);
+	}
 }
 
 export {
 	FrameProcessor,
 	Message,
 	NonRealTimeVAD,
+	RealTimeVAD,
 	Resampler,
-	StreamVAD,
-	createStreamVAD,
 	defaultRealTimeVADOptions,
 	utils,
 };
