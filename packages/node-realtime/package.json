@@ -12,7 +12,7 @@
 		"offline-speech-recognition"
 	],
 	"homepage": "https://github.com/eric-edouard/vad-node-realtime",
-	"version": "0.1.2",
+	"version": "0.2.0",
 	"license": "ISC",
 	"main": "dist/index.js",
 	"scripts": {
