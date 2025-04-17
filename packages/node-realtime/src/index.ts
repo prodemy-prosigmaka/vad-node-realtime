@@ -4,55 +4,56 @@ import {
 	FrameProcessor,
 	type FrameProcessorOptions,
 	Message,
-	type NonRealTimeVADOptions,
-	PlatformAgnosticNonRealTimeVAD,
 	Resampler,
 	utils,
 } from "./common";
+
 import {
 	RealTimeVAD as BaseRealTimeVAD,
+	DEFAULT_MODEL,
 	type RealTimeVADOptions,
-	defaultRealTimeVADOptions,
+	getDefaultRealTimeVADOptions,
 } from "./real-time-vad";
 
-const modelPath = `${__dirname}/silero_vad.onnx`;
+const LEGACY_MODEL_PATH = `${__dirname}/silero_vad_legacy.onnx`;
+const V5_MODEL_PATH = `${__dirname}/silero_vad_v5.onnx`;
 
-const modelFetcher = async (): Promise<ArrayBuffer> => {
-	const contents = await fs.readFile(modelPath);
-	return contents.buffer;
+const fetchLegacyModel = async (): Promise<ArrayBuffer> => {
+	const data = await fs.readFile(LEGACY_MODEL_PATH);
+	return data.buffer;
 };
 
-class NonRealTimeVAD extends PlatformAgnosticNonRealTimeVAD {
-	static async new(
-		options: Partial<NonRealTimeVADOptions> = {},
-	): Promise<NonRealTimeVAD> {
-		return await PlatformAgnosticNonRealTimeVAD._new(
-			modelFetcher,
-			ort,
-			options,
-		);
-	}
-}
+const fetchV5Model = async (): Promise<ArrayBuffer> => {
+	const data = await fs.readFile(V5_MODEL_PATH);
+	return data.buffer;
+};
 
-class RealTimeVAD extends BaseRealTimeVAD {
+export { NonRealTimeVAD } from "./common/non-real-time-vad";
+export type { NonRealTimeVADOptions } from "./common/non-real-time-vad";
+
+/**
+ * RealTimeVAD with selectable model version (v5 default)
+ */
+export class RealTimeVAD extends BaseRealTimeVAD {
 	static override async new(
 		options: Partial<RealTimeVADOptions> = {},
 	): Promise<RealTimeVAD> {
-		return await BaseRealTimeVAD._new(modelFetcher, ort, options);
+		// determine which model to use
+		const modelVersion = options.model ?? DEFAULT_MODEL;
+		const fetcher = modelVersion === "v5" ? fetchV5Model : fetchLegacyModel;
+		// build full defaults including correct frame processor opts
+		const defaults = getDefaultRealTimeVADOptions(modelVersion);
+		const opts = { ...defaults, ...options };
+		return BaseRealTimeVAD.new(ort, fetcher, opts) as Promise<RealTimeVAD>;
 	}
 }
 
 export {
+	DEFAULT_MODEL,
 	FrameProcessor,
 	Message,
-	NonRealTimeVAD,
-	RealTimeVAD,
 	Resampler,
-	defaultRealTimeVADOptions,
+	getDefaultRealTimeVADOptions,
 	utils,
 };
-export type {
-	FrameProcessorOptions,
-	NonRealTimeVADOptions,
-	RealTimeVADOptions,
-};
+export type { FrameProcessorOptions, RealTimeVADOptions };
