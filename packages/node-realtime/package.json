@@ -29,6 +29,6 @@
 		"wav-decoder": "^1.3.0"
 	},
 	"dependencies": {
-		"onnxruntime-node": "^1.14.0"
+		"onnxruntime-node": "^1.22.0-rev"
 	}
 }
